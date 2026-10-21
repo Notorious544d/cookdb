@@ -1,137 +1,58 @@
-// This file includes a substantial portion of code from
-// https://github.com/Zheoni/cooklang-chef
-//
-// The original code is licensed under the MIT License, a copy of which
-// is provided below in addition to our project's license.
-//
-//
+mod build_db;
+mod ingredients;
+mod read_db;
+mod render;
 
-// MIT License
+use std::path::Path;
 
-// Copyright (c) 2023 Francisco J. Sanchez
+use anyhow::Context;
+use cooklang::{Converter, CooklangParser, Extensions};
+use rusqlite::{Connection, OpenFlags};
 
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
 
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+fn main() -> anyhow::Result<()> {
+    let recipes = Path::new(r"C:\Users\SESMAIL\Documents\homelab-config\food\recipes");
+    let db_path = Path::new("recipes.db");
 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+    // Create once, reuse for every file.
+    let parser = CooklangParser::new(Extensions::all(), Converter::default());
 
-use crate::util::resolve_to_absolute_path;
-use anyhow::{bail, Result};
-use args::{CliArgs, Command};
-use camino::Utf8PathBuf;
-use clap::Parser;
+    // let recipe = build_db::load_recipe(&parser, &recipes.join("Seebian.cook"))?;
 
-/// The one `Context` definition, shared with every other consumer of the
-/// library. The CLI adds only the base-path validation in
-/// [`configure_context`]; aisle and pantry discovery is core's.
-pub use cookcli_core::Context;
+    let n = build_db::build(&parser, recipes, db_path)?;
+    println!("built {} with {n} recipes", db_path.display());
 
-// commands
-mod build;
-mod completions;
-mod doctor;
-#[cfg(feature = "import")]
-mod import;
-#[cfg(feature = "sync")]
-mod login;
-#[cfg(feature = "sync")]
-mod logout;
-#[cfg(feature = "lsp")]
-mod lsp;
-mod pantry;
-mod recipe;
-mod report;
-mod search;
-mod seed;
-#[cfg(feature = "server")]
-mod server;
-mod shopping_list;
-#[cfg(feature = "sync")]
-mod sync;
-#[cfg(feature = "self-update")]
-mod update;
-mod web;
+    let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .with_context(|| format!("opening {}", db_path.display()))?;
 
-// other modules
-mod args;
-mod util;
+    let mut recipe = read_db::fetch_recipe(&conn, "Seebian")?
+        .context("recipe 'Seebian' not found")?;
+    read_db::Scale::Factor(2.0).apply(&mut recipe, parser.converter())?;
 
-pub fn main() -> Result<()> {
-    let args = CliArgs::parse();
-    configure_logging(args.verbosity);
+    let page = render::RecipePage::new("Seebian", &recipe, parser.converter());
+    std::fs::write("Seebian.html", page.html()?)?;
 
-    let ctx = configure_context()?;
+    Ok(())
 
-    match args.command {
-        Command::Recipe(args) => recipe::run(&ctx, args),
-        #[cfg(feature = "server")]
-        Command::Server(args) => server::run(ctx, args),
-        Command::Build(args) => build::run(&ctx, args),
-        Command::ShoppingList(args) => shopping_list::run(&ctx, args),
-        Command::Seed(args) => seed::run(&ctx, args),
-        Command::Search(args) => search::run(&ctx, args),
-        #[cfg(feature = "import")]
-        Command::Import(args) => import::run(&ctx, args),
-        Command::Report(args) => report::run(&ctx, args),
-        Command::Doctor(args) => doctor::run(&ctx, args),
-        Command::Pantry(args) => pantry::run(&ctx, args),
-        #[cfg(feature = "lsp")]
-        Command::Lsp(args) => lsp::run(&ctx, args),
-        #[cfg(feature = "sync")]
-        Command::Login(args) => login::run(&ctx, args),
-        #[cfg(feature = "sync")]
-        Command::Logout(args) => logout::run(&ctx, args),
-        Command::Completions(args) => completions::run(args),
-        #[cfg(feature = "self-update")]
-        Command::Update(args) => update::run(args),
-    }
-}
-
-fn configure_context() -> Result<Context> {
-    let args = CliArgs::parse();
-    let base_path = args
-        .command
-        .base_path()
-        .unwrap_or_else(|| Utf8PathBuf::from("."));
-
-    // Core neither resolves nor validates the base path, deliberately. The CLI
-    // does both, so a mistyped `--base-path` fails here with one clear message
-    // rather than as a recipe-not-found from whichever command runs next.
-    let absolute_base_path = resolve_to_absolute_path(&base_path)?;
-
-    if !absolute_base_path.is_dir() {
-        bail!("Base path is not a directory: {}", absolute_base_path);
+    /*
+    for ing in &recipe.ingredients {
+        match IngredientData::load(&ingredients_dir, &ing.name)? {
+            Some(data) => println!(
+                "{}: density {} price/unit {:.5}",
+                ing.name,
+                data.meta.density,
+                data.price_per_unit()?
+            ),
+            None => println!("{}: no data", ing.name),
+        }
     }
 
-    Ok(Context::discover(absolute_base_path))
-}
+    for w in warnings.iter() {
+        eprintln!("warning: {w}");
+    }
 
-fn configure_logging(verbosity: u8) {
-    let env_filter = match verbosity {
-        0 => "warn,cook=warn",   // Default: warnings and errors only
-        1 => "info,cook=info",   // -v: info level
-        2 => "debug,cook=debug", // -vv: debug level
-        _ => "trace,cook=trace", // -vvv or more: trace level
-    };
-
-    tracing_subscriber::fmt()
-        .with_env_filter(env_filter)
-        .without_time()
-        .with_target(false)
-        .compact()
-        .with_writer(std::io::stderr)
-        .init();
+    for (i, ing) in recipe.ingredients.iter().enumerate() {
+        println!("{i} {} {:?}", ing.name, ing.quantity);
+    }
+    */
 }
