@@ -1,25 +1,15 @@
 {
-  "name": "cookcli",
+  "name": "cookdb",
   "version": "1.0.0",
-  "description": "CookCLI web interface",
+  "description": "CookDB web interface",
   "scripts": {
     "build-css": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify",
     "watch-css": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch",
     "build-js": "esbuild static/js/src/editor.js --bundle --outfile=static/js/editor.bundle.js --format=iife --minify",
-    "watch-js": "esbuild static/js/src/editor.js --bundle --outfile=static/js/editor.bundle.js --format=iife --watch",
-    "test": "playwright test",
-    "test:ui": "playwright test --ui",
-    "test:debug": "playwright test --debug",
-    "test:headed": "playwright test --headed",
-    "test:chrome": "playwright test --project=chromium",
-    "test:firefox": "playwright test --project=firefox",
-    "test:webkit": "playwright test --project=webkit",
-    "test:mobile": "playwright test --project=\"Mobile Chrome\" --project=\"Mobile Safari\"",
-    "test:report": "playwright show-report",
-    "test:codegen": "playwright codegen http://localhost:9080"
+    "watch-js": "esbuild static/js/src/editor.js --bundle --outfile=static/js/editor.bundle.js --format=iife --watch"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.14.0",
+    "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/language": "^6.13.1",
     "@codemirror/lint": "^6.9.7",
@@ -27,18 +17,8 @@
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.14",
     "@lezer/highlight": "^1.2.5",
-    "@playwright/test": "^1.64.1",
     "@tailwindcss/cli": "^4.3.3",
     "esbuild": "^0.28.2",
-    "playwright": "^1.55.0",
     "tailwindcss": "^4.3.3"
-  },
-  "dependencies": {
-    "@codemirror/autocomplete": "^6.20.3"
-  },
-  "overrides": {
-    "picomatch": ">=2.3.2",
-    "minimatch": ">=9.0.7",
-    "yaml": ">=2.8.3"
   }
 }

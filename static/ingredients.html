@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ingredients</title>
+    <link rel="stylesheet" href="css/output.css">
+    <link rel="manifest" href="site.webmanifest">
+    <link rel="icon" href="favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32x32.png">
+    <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+    <style>
+        .viewport {
+            width: 100%;
+            max-width: 72rem;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .ingredients-layout {
+            display: grid;
+            grid-template-columns: minmax(14rem, 1fr) minmax(0, 2fr);
+            gap: 1.5rem;
+        }
+
+        .ingredient-options {
+            display: grid;
+            gap: .5rem;
+            max-height: 65vh;
+            overflow-y: auto;
+        }
+
+        .ingredient-option {
+            padding: .65rem .75rem;
+            text-align: left;
+            color: var(--text);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-control);
+            cursor: pointer;
+        }
+
+        .ingredient-option:hover,
+        .ingredient-option[aria-pressed="true"] {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+        }
+
+        .comparison-scroll {
+            overflow-x: auto;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--text-meta);
+            white-space: nowrap;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: .65rem .75rem;
+            border-bottom: 1px solid var(--border);
+            text-align: right;
+        }
+
+        .comparison-table th:first-child,
+        .comparison-table td:first-child {
+            text-align: left;
+        }
+
+        .comparison-table th {
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        @media (max-width: 700px) {
+            .ingredients-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .ingredient-options {
+                max-height: 14rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-bg text-text">
+    <div class="viewport">
+        <div id="site-header"></div>
+
+        <main>
+            <header class="mb-8">
+                <h1 class="text-display font-bold">Ingredients</h1>
+                <p id="ingredient-count" class="text-sm text-muted"></p>
+            </header>
+
+            <div class="ingredients-layout">
+                <section class="card p-6" aria-labelledby="ingredients-heading">
+                    <h2 id="ingredients-heading" class="text-title font-bold mb-4">Ingredients</h2>
+                    <div id="ingredient-list" class="ingredient-options"></div>
+                </section>
+
+                <section class="card p-6" aria-labelledby="products-heading" aria-live="polite">
+                    <h2 id="products-heading" class="text-title font-bold mb-2">
+                        Select an ingredient
+                    </h2>
+                    <p id="product-hint" class="text-sm text-muted">
+                        Choose an ingredient to compare its products.
+                    </p>
+
+                    <div id="comparison-scroll" class="comparison-scroll hidden">
+                        <table class="comparison-table">
+                            <thead id="product-columns"></thead>
+                            <tbody id="product-rows"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+    <script src="js/keyboard-shortcuts.js"></script>
+    <script src="js/sql-wasm.js"></script>
+    <script type="module" src="js/ingredients.js"></script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+name: Release
+on:
+  push:
+    branches: [main]
+    paths: [Cargo.toml]
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      new: ${{ steps.v.outputs.new }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          tag="v$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+  release:
+    needs: check
+    if: needs.check.outputs.new == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci && npm run build-css
+      - run: cargo build --release
+      - run: |
+          mkdir dist
+          cp target/release/cookdb dist/
+          cp -r static dist/static
+          rm -f dist/static/recipes.db
+          tar -czf cookdb-linux-x86_64.tar.gz -C dist .
+      - run: gh release create "${{ needs.check.outputs.tag }}" cookdb-linux-x86_64.tar.gz --target "$GITHUB_SHA" --generate-notes
+        env: { GH_TOKEN: "${{ github.token }}" }

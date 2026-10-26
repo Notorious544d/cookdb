@@ -1,0 +1,44 @@
+name: Build CookDB site
+description: Turn a folder of Cooklang recipes into a static recipe website
+inputs:
+  recipes-dir:
+    description: Directory containing the .cook files (and the db/ folder)
+    default: "."
+  output-dir:
+    description: Where the finished site is written
+    default: _site
+  version:
+    description: cookdb release to use, e.g. v1.2.3. Defaults to the action's own tag, else the latest release.
+    default: ""
+outputs:
+  path:
+    description: Directory containing the finished site
+    value: ${{ inputs.output-dir }}
+runs:
+  using: composite
+  steps:
+    - name: Install cookdb
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INPUT_VERSION: ${{ inputs.version }}
+        ACTION_REF: ${{ github.action_ref }}
+      run: |
+        semver='^v[0-9]+\.[0-9]+\.[0-9]+$'
+        tag=""
+        for candidate in "$INPUT_VERSION" "$ACTION_REF"; do
+          if [[ "$candidate" =~ $semver ]]; then tag="$candidate"; break; fi
+        done
+        gh release download $tag --repo ${{ github.action_repository }} \
+          --pattern cookdb-linux-x86_64.tar.gz --dir "$RUNNER_TEMP"
+        mkdir -p "$RUNNER_TEMP/cookdb"
+        tar -xzf "$RUNNER_TEMP/cookdb-linux-x86_64.tar.gz" -C "$RUNNER_TEMP/cookdb"
+    - name: Build site
+      shell: bash
+      env:
+        RECIPES_DIR: ${{ inputs.recipes-dir }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+      run: |
+        rm -rf "$OUTPUT_DIR"
+        cp -r "$RUNNER_TEMP/cookdb/static" "$OUTPUT_DIR"
+        "$RUNNER_TEMP/cookdb/cookdb" build "$RECIPES_DIR" "$OUTPUT_DIR"

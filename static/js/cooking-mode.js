@@ -122,9 +122,8 @@
                 const items = card.ingredients.map(function(ing) {
                     const qty = [ing.quantity, ing.unit].filter(Boolean).join(' ');
                     const note = ing.note ? '<span class="cooking-mise-note">(' + escapeHTML(ing.note) + ')</span>' : '';
-                    const optional = ing.optional ? ' <span class="cooking-mise-note">' + escapeHTML(state.optionalLabel) + '</span>' : '';
                     return '<div class="cooking-mise-item">' +
-                        '<span class="cooking-mise-name">' + escapeHTML(ing.name) + ' ' + note + optional + '</span>' +
+                        '<span class="cooking-mise-name">' + escapeHTML(ing.name) + ' ' + note + '</span>' +
                         (qty ? '<span class="cooking-mise-qty">' + escapeHTML(qty) + '</span>' : '') +
                         '</div>';
                 }).join('');
@@ -548,7 +547,6 @@
         state.triggerElement = document.activeElement;
 
         const stepHTMLs = captureStepHTML();
-        state.optionalLabel = data.optionalLabel || '(optional)';
         state.cards = buildCards(data, stepHTMLs);
         if (state.cards.length === 0) return;
 

@@ -6,13 +6,13 @@
    whole-repo auto-detection, so only the paths named below are scanned. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-@source "../../templates";
-@source "../../static/js/*.js";
-@source "../../static/js/src";
-@source not "../../static/js/editor.bundle.js";
+@source "../js/*.js";
+@source "../js/src";
+@source not "../js/editor.bundle.js";
 /* The one Rust file that emits class names: method_classes() for the API
-   docs method badge. */
-@source "../../src/web/templates.rs";
+   docs method badge. 
+@source "../../src/web/templates.rs"; */
+@source "../*.html";
 
 /* ============================================================
    DESIGN TOKENS
