@@ -29,7 +29,7 @@ runs:
         for candidate in "$INPUT_VERSION" "$ACTION_REF"; do
           if [[ "$candidate" =~ $semver ]]; then tag="$candidate"; break; fi
         done
-        gh release download $tag --repo ${{ github.action_repository }} \
+        gh release download ${tag:+"$tag"} --repo Notorious544d/cookdb \
           --pattern cookdb-linux-x86_64.tar.gz --dir "$RUNNER_TEMP"
         mkdir -p "$RUNNER_TEMP/cookdb"
         tar -xzf "$RUNNER_TEMP/cookdb-linux-x86_64.tar.gz" -C "$RUNNER_TEMP/cookdb"
