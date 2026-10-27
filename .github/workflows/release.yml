@@ -30,12 +30,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with: { targets: wasm32-unknown-unknown }
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci && npm run build-css
+      - run: cargo install wasm-bindgen-cli --locked
       - run: cargo build --release
       - run: |
+          cargo build -p cookdb-wasm --release --target wasm32-unknown-unknown
+          wasm-bindgen --target web --out-dir static/wasm \
+          target/wasm32-unknown-unknown/release/cookdb_wasm.wasm
           mkdir dist
           cp target/release/cookdb dist/
           cp -r static dist/static
