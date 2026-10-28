@@ -1,18 +1,19 @@
 use clap::Args;
 use rusqlite::{Connection, OpenFlags, types::ValueRef};
 use std::path::PathBuf;
+use crate::context::Context;
 
 #[derive(Args)]
 pub struct QueryArgs {
-    /// SQL to run
     pub sql: String,
-    /// Path to the database
-    #[arg(long, default_value = "static/recipes.db")]
-    pub db: PathBuf,
+    /// Path to the database [default: <base-path>/_site/recipes.db]
+    #[arg(long)]
+    pub db: Option<PathBuf>,
 }
 
-pub fn run(args: QueryArgs) -> anyhow::Result<()> {
-    let conn = Connection::open_with_flags(&args.db, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+pub fn run(ctx: &Context, args: QueryArgs) -> anyhow::Result<()> {
+    let db = args.db.unwrap_or_else(|| ctx.db_path());
+    let conn = Connection::open_with_flags(&db, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let mut stmt = conn.prepare(&args.sql)?;
     let cols = stmt.column_count();
     println!("{}", stmt.column_names().join("\t"));

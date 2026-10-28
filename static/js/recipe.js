@@ -1,4 +1,5 @@
 import { openDb, query } from './db.js';
+import { mountRecipeSearch } from './search.js';
 import { mountSiteHeader } from './site-header.js';
 import { quantityText } from './scale.js';
 
@@ -206,86 +207,7 @@ const db = await openDb();
 
 // Added
 let linkedRecipeSlugs = new Map();
-const searchInput = document.getElementById('search-input');
-const searchResults = document.getElementById('search-results');
-let searchTimeout;
-
-searchInput.addEventListener('input', () => {
-    clearTimeout(searchTimeout);
-    const term = searchInput.value.trim();
-
-    if (term.length < 2) {
-        searchResults.classList.add('hidden');
-        return;
-    }
-
-    searchTimeout = setTimeout(() => {
-        const like = `%${term}%`;
-        const matches = query(db, `
-          SELECT DISTINCT
-              r.slug,
-              COALESCE(NULLIF(r.title, ''), r.slug) AS title
-          FROM recipes r
-          LEFT JOIN recipe_tags t ON t.slug = r.slug
-          LEFT JOIN recipe_ingredients ri ON ri.recipe_slug = r.slug
-          LEFT JOIN recipe_data rd ON rd.slug = r.slug
-          WHERE COALESCE(NULLIF(r.title, ''), r.slug) LIKE ? OR t.tag LIKE ? OR ri.ingredient_name LIKE ? OR rd.json LIKE ?
-          ORDER BY title
-          LIMIT 20`,
-        [like, like, like, like]);
-
-        searchResults.replaceChildren();
-
-        if (matches.length === 0) {
-            searchResults.append(el('div', 'p-4 text-muted text-center', 'No recipes found'));
-        } else {
-            for (const match of matches) {
-                const link = el('a', 'search-result block px-4 py-3 hover:bg-sunk border-b border-line last:border-b-0', match.title);
-                link.href = `recipe.html?slug=${encodeURIComponent(match.slug)}`;
-                searchResults.append(link);
-            }
-        }
-
-        searchResults.classList.remove('hidden');
-    }, 300);
-});
-
-document.addEventListener('click', (event) => {
-    if (!searchInput.contains(event.target) && !searchResults.contains(event.target)) {
-        searchResults.classList.add('hidden');
-    }
-});
-// End
-
-let selectedSearchIndex = -1;
-
-searchInput.addEventListener('input', () => {
-    selectedSearchIndex = -1;
-});
-
-searchInput.addEventListener('keydown', (event) => {
-    const links = searchResults.querySelectorAll('a');
-    if (links.length === 0 || searchResults.classList.contains('hidden')) return;
-
-    if (event.key === 'ArrowDown') {
-        event.preventDefault();
-        selectedSearchIndex = Math.min(selectedSearchIndex + 1, links.length - 1);
-    } else if (event.key === 'ArrowUp') {
-        event.preventDefault();
-        selectedSearchIndex = Math.max(selectedSearchIndex - 1, 0);
-    } else if (event.key === 'Enter' && selectedSearchIndex >= 0) {
-        event.preventDefault();
-        links[selectedSearchIndex].click();
-        return;
-    } else {
-        return;
-    }
-
-    links.forEach((link, index) => {
-        link.classList.toggle('search-selected', index === selectedSearchIndex);
-    });
-    links[selectedSearchIndex].scrollIntoView({ block: 'nearest' });
-});
+mountRecipeSearch(db);
 
 const [row] = query(db, 'SELECT json FROM recipe_data WHERE slug = ?', [slug]);
 if (!row) {

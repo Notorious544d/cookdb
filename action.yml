@@ -4,16 +4,13 @@ inputs:
   recipes-dir:
     description: Directory containing the .cook files (and the db/ folder)
     default: "."
-  output-dir:
-    description: Where the finished site is written
-    default: _site
   version:
     description: cookdb release to use, e.g. v1.2.3. Defaults to the action's own tag, else the latest release.
     default: ""
 outputs:
   path:
     description: Directory containing the finished site
-    value: ${{ inputs.output-dir }}
+    value: ${{ inputs.recipes-dir }}/_site
 runs:
   using: composite
   steps:
@@ -37,8 +34,7 @@ runs:
       shell: bash
       env:
         RECIPES_DIR: ${{ inputs.recipes-dir }}
-        OUTPUT_DIR: ${{ inputs.output-dir }}
       run: |
-        rm -rf "$OUTPUT_DIR"
-        cp -r "$RUNNER_TEMP/cookdb/static" "$OUTPUT_DIR"
-        "$RUNNER_TEMP/cookdb/cookdb" build "$RECIPES_DIR" "$OUTPUT_DIR"
+        rm -rf "$RECIPES_DIR/_site"
+        cp -r "$RUNNER_TEMP/cookdb/static" "$RECIPES_DIR/_site"
+        "$RUNNER_TEMP/cookdb/cookdb" --base-path "$RECIPES_DIR" build

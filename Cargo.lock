@@ -172,8 +172,30 @@ version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",
+ "cookdb-core",
+ "cookdb-db",
+ "cooklang",
+ "rusqlite",
+ "serde_json",
+]
+
+[[package]]
+name = "cookdb-core"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
  "cooklang",
  "cooklang-format",
+ "serde_json",
+]
+
+[[package]]
+name = "cookdb-db"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "cookdb-core",
+ "cooklang",
  "cooklang-ingredients",
  "rusqlite",
  "serde",
@@ -182,8 +204,9 @@ dependencies = [
 
 [[package]]
 name = "cookdb-wasm"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
+ "cookdb-core",
  "cooklang",
  "serde_json",
  "wasm-bindgen",

@@ -1,4 +1,5 @@
 import { openDb, query } from './db.js';
+import { searchRecipes } from './search.js';
 import { mountSiteHeader } from './site-header.js';
 
 mountSiteHeader();
@@ -33,30 +34,14 @@ for (const { slug, tag } of query(db, 'SELECT slug, tag FROM recipe_tags ORDER B
   tagsByRecipe.get(key).push(tag);
 }
 
-const ingredientsByRecipe = new Map();
-for (const { recipe_slug, ingredient_name } of query(
-  db,
-  'SELECT recipe_slug, ingredient_name FROM recipe_ingredients ORDER BY ingredient_name',
-)) {
-  const key = recipe_slug.toLowerCase();
-  if (!ingredientsByRecipe.has(key)) ingredientsByRecipe.set(key, []);
-  ingredientsByRecipe.get(key).push(ingredient_name);
-}
-
 function render() {
-  const term = search.value.trim().toLowerCase();
-  const matches = recipes.filter((recipe) => {
-    const key = recipe.slug.toLowerCase();
-    const searchable = [
-      recipe.title,
-      recipe.cuisine ?? '',
-      ...(tagsByRecipe.get(key) ?? []),
-      ...(ingredientsByRecipe.get(key) ?? []),
-    ].join(' ').toLowerCase();
-
-    return searchable.includes(term);
-  });
-
+  const term = search.value.trim();
+  const matches = term
+    ? (() => {
+        const slugs = new Set(searchRecipes(db, term).map((r) => r.slug));
+        return recipes.filter((r) => slugs.has(r.slug));
+      })()
+    : [...recipes];
   const field = sortField.value;
   const collator = new Intl.Collator(undefined, {
     numeric: true,

@@ -1,0 +1,13 @@
+[package]
+name = "cookdb-wasm"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+cookdb-core = { workspace = true }
+cooklang = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = "0.2"

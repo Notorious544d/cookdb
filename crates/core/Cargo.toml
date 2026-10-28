@@ -1,0 +1,10 @@
+[package]
+name = "cookdb-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow = "1"
+cooklang = { workspace = true }
+cooklang-format = { workspace = true }
+serde_json = { workspace = true }

@@ -1,5 +1,7 @@
+pub mod nutrition;
+
 use anyhow::Context;
-use cooklang::{CooklangParser, Recipe};
+use cooklang::{Recipe};
 use rusqlite::{Connection, Transaction, params};
 use std::path::Path;
 use crate::nutrition::{Enriched};
@@ -9,34 +11,20 @@ use std::collections::HashMap;
 #[cfg(feature = "nutrition")]
 use crate::nutrition::EnrichedIngredients;
 
-const SCHEMA: &str = include_str!("../schema/schema.sql");
-const SEED: &str = include_str!("../schema/vocab.sql");
+const SCHEMA: &str = include_str!("../schema.sql");
+const SEED: &str = include_str!("../vocab.sql");
 
 const CUISINE_EXISTS: &str = "SELECT 1 FROM cuisines WHERE name = ?1";
 const TAG_EXISTS: &str = "SELECT 1 FROM tags WHERE name = ?1";
 
 /// Rebuilds the database from every `.cook` file directly under `recipes_dir`.
-pub fn build(
-    parser: &CooklangParser,
-    recipes_dir: &Path,
-    db_path: &Path,
-    _enriched: Option<&Enriched>,
-) -> anyhow::Result<usize> {
+pub fn build(recipes_dir: &Path, db_path: &Path, _enriched: Option<&Enriched>) -> anyhow::Result<usize> {
     let mut conn = create(db_path)?;
     let tx = conn.transaction()?;
     let mut count = 0;
-    for entry in std::fs::read_dir(recipes_dir)
-        .with_context(|| format!("reading {}", recipes_dir.display()))?
-    {
-        let path = entry?.path();
-        if path.extension().and_then(|e| e.to_str()) != Some("cook") {
-            continue;
-        }
-        let slug = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .context("non-UTF-8 file name")?;
-        let recipe = load_recipe(parser, &path)?;
+    for path in cookdb_core::parse::recipe_files(recipes_dir)? {
+        let slug = cookdb_core::parse::slug(&path)?;
+        let recipe = cookdb_core::parse::load_recipe(&path)?;
         insert_recipe(&tx, slug, &recipe)
             .with_context(|| format!("inserting {}", path.display()))?;
         count += 1;
@@ -44,26 +32,12 @@ pub fn build(
 
     #[cfg(feature = "nutrition")]
     if let Some(e) = _enriched {
-        insert_enriched_tags(&tx, e)?;
         insert_enriched_recipes(&tx, e)?;
         insert_enriched_ingredients(&tx, e)?;
     }
 
     tx.commit()?;
     Ok(count)
-}
-
-pub fn load_recipe(parser: &CooklangParser, path: &Path) -> anyhow::Result<Recipe> {
-    let text =
-        std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
-    let (recipe, warnings) = parser
-        .parse(&text)
-        .into_result()
-        .map_err(|e| anyhow::anyhow!("parsing {}: {e}", path.display()))?;
-    for w in warnings.iter() {
-        eprintln!("warning: {}: {w}", path.display());
-    }
-    Ok(recipe)
 }
 
 /// Creates a fresh database, replacing any existing file.
@@ -89,7 +63,7 @@ fn ensure_known(
 ) -> anyhow::Result<()> {
     anyhow::ensure!(
         tx.prepare_cached(sql)?.exists([value])?,
-        "{slug}: unknown {kind} '{value}' (add it to schema/seed.sql)"
+        "{slug}: unknown {kind} '{value}' (add it to vocab.sql)"
     );
     Ok(())
 }
@@ -104,7 +78,8 @@ fn insert_recipe(tx: &Transaction, slug: &str, recipe: &Recipe) -> anyhow::Resul
         "INSERT INTO recipes (slug, title, cuisine) VALUES (?1, ?2, ?3)",
         params![slug, m.title(), cuisine],
     )?;
-    /* Tags fron frontmatter
+
+    // Tags from frontmatter
     for tag in m.tags().unwrap_or_default() {
         let tag = tag.trim();
         ensure_known(tx, TAG_EXISTS, slug, "tag", tag)?;
@@ -113,7 +88,6 @@ fn insert_recipe(tx: &Transaction, slug: &str, recipe: &Recipe) -> anyhow::Resul
             params![slug, tag],
         )?;
     }
-    */
     insert_data(tx, slug, recipe)?;
     Ok(())
 }
@@ -124,45 +98,6 @@ fn insert_data(tx: &Transaction, slug: &str, recipe: &Recipe) -> anyhow::Result<
         "INSERT INTO recipe_data (slug, json) VALUES (?1, ?2)",
         params![slug, json],
     )?;
-    Ok(())
-}
-
-#[cfg(feature = "nutrition")]
-fn insert_enriched_tags(
-    tx: &Transaction,
-    enriched_recipes: &HashMap<String, EnrichedIngredients>,
-) -> anyhow::Result<()> {
-    const TAGS_FOR_INGREDIENT: &str = "
-        SELECT name FROM tags WHERE name = ?1
-        UNION
-        SELECT tag FROM ingredient_tag_map WHERE ingredient = ?1
-    ";
-
-    let mut find_tags = tx.prepare_cached(TAGS_FOR_INGREDIENT)?;
-    let mut insert_tag =
-        tx.prepare_cached("INSERT OR IGNORE INTO recipe_tags (slug, tag) VALUES (?1, ?2)")?;
-
-    for (slug, enriched) in enriched_recipes {
-        let database_slug: String = tx.query_row(
-            "SELECT slug FROM recipes WHERE slug = ?1 COLLATE NOCASE",
-            [slug],
-            |row| row.get(0),
-        )?;
-
-    for ingredient_name in enriched
-        .iter()
-        .map(|ingredient| ingredient.name.as_str())
-            {
-                let tags = find_tags
-                    .query_map([ingredient_name.trim()], |row| row.get::<_, String>(0))?
-                    .collect::<rusqlite::Result<Vec<_>>>()?;
-
-                for tag in tags {
-                    insert_tag.execute(params![database_slug, tag])?;
-                }
-            }
-        }
-
     Ok(())
 }
 

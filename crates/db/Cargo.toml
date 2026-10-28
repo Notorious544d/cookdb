@@ -1,0 +1,17 @@
+[package]
+name = "cookdb-db"
+version.workspace = true
+edition.workspace = true
+
+[features]
+default = ["nutrition"]
+nutrition = ["dep:cooklang-ingredients"]
+
+[dependencies]
+anyhow = "1"
+cookdb-core = { workspace = true }
+cooklang = { workspace = true }
+cooklang-ingredients = { git = "https://github.com/Notorious544d/cooklang-ingredients", branch = "main", optional = true }
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { workspace = true }
