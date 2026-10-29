@@ -35,12 +35,15 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci && npm run build-css
-      - run: cargo install wasm-bindgen-cli --locked
+      - id: wb
+        run: echo "version=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | grep -m1 '^version' | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+      - run: cargo install wasm-bindgen-cli --version ${{ steps.wb.outputs.version }} --locked
       - run: cargo build --release
       - run: |
           cargo build -p cookdb-wasm --release --target wasm32-unknown-unknown
-          wasm-bindgen --target web --out-dir static/wasm \
-          target/wasm32-unknown-unknown/release/cookdb_wasm.wasm
+          wasm-bindgen --target web --no-typescript --out-dir static/wasm \
+            target/wasm32-unknown-unknown/release/cookdb_wasm.wasm
+          test -f static/wasm/cookdb_wasm.js && test -f static/wasm/cookdb_wasm_bg.wasm || exit 1
           mkdir dist
           cp target/release/cookdb dist/
           cp -r static dist/static

@@ -2,7 +2,7 @@ import { openDb, query } from './db.js';
 import { searchRecipes } from './search.js';
 import { mountSiteHeader } from './site-header.js';
 
-mountSiteHeader();
+await mountSiteHeader();
 
 const search = document.getElementById('search-input');
 const list = document.getElementById('recipe-list');

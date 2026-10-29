@@ -1,9 +1,9 @@
 import { openDb, query } from './db.js';
 import { mountRecipeSearch } from './search.js';
 import { mountSiteHeader } from './site-header.js';
-import { quantityText } from './scale.js';
+import init, { ScalableRecipe } from '../wasm/cookdb_wasm.js';
 
-mountSiteHeader();
+await mountSiteHeader();
 
 const el = (tag, cls, text) => {
   const e = document.createElement(tag);
@@ -94,7 +94,7 @@ function renderNutrition(data, scale) {
   table.classList.remove('hidden');
 }
 
-function stepEl(recipe, step, f) {
+function stepEl(recipe, step, t) {
   const body = el('div', 'step-body mb-2');
   const refs = [];
   for (const item of step.items) {
@@ -104,8 +104,8 @@ function stepEl(recipe, step, f) {
         const ing = recipe.ingredients[item.index];
         const name = ing.alias ?? ing.name;
         body.append(el('span', 'ingredient-badge', name));
-        const q = quantityText(ing.quantity, f);
-        refs.push(q ? `${name}: ${q}` : name);
+        const amount = t.ingredients[item.index];
+        refs.push(amount ? `${name}: ${amount}` : name);
         break;
       }
       case 'cookware': {
@@ -114,10 +114,10 @@ function stepEl(recipe, step, f) {
         break;
       }
       case 'timer':
-        body.append(el('span', 'timer-badge', '⏱️ ' + quantityText(recipe.timers[item.index].quantity, f)));
+        body.append(el('span', 'timer-badge', '⏱️ ' + t.timers[item.index]));
         break;
       case 'inlineQuantity':
-        body.append(el('span', 'font-bold text-accent-text', quantityText(recipe.inline_quantities[item.index], f)));
+        body.append(el('span', 'font-bold text-accent-text', t.inline[item.index]));
         break;
     }
   }
@@ -125,7 +125,7 @@ function stepEl(recipe, step, f) {
   col.append(body);
   if (refs.length) {
     const r = el('div', 'step-refs');
-    refs.forEach((t) => r.append(el('span', 'inline-block mr-3', t)));
+    refs.forEach((text) => r.append(el('span', 'inline-block mr-3', text)));
     col.append(r);
   }
   const row = el('div', 'flex gap-4');
@@ -136,6 +136,19 @@ function stepEl(recipe, step, f) {
 }
 
 function render(recipe, f) {
+  const t = JSON.parse(scalable.scaled_text(f, 'original'));
+  updateScaleNotice(f);
+
+  const cookware = recipe.cookware.filter((c) => c.relation.type === 'definition');
+  document.getElementById('cookware-card').hidden = cookware.length === 0;
+  document.getElementById('cookware').replaceChildren(
+    ...cookware.map((c) => {
+      const li = el('li', 'ingredient-row');
+      li.append(el('span', 'font-medium', c.alias ?? c.name));
+      return li;
+    }),
+  );
+  
   if (enrichedIngredients) renderNutrition(enrichedIngredients, f);
   document.getElementById('ingredients').replaceChildren(
     ...recipe.ingredients
@@ -185,37 +198,111 @@ function render(recipe, f) {
         }
 
         const li = el('li', 'ingredient-row');
-        li.append(name, el('span', 'row-value ml-2', quantityText(i.quantity, f)));
+        li.append(name, el('span', 'row-value ml-2', t.ingredients[position]));
         return li;
       }),
   );
   document.getElementById('steps').replaceChildren(
     ...recipe.sections.flatMap((s) =>
       s.content.map((c) => {
-        if (c.type === 'step') return stepEl(recipe, c.value, f);
+        if (c.type === 'step') return stepEl(recipe, c.value, t);
         const li = el('li', 'recipe-note mb-3');
         li.append(el('span', '', '📝'), el('p', 'm-0', c.value));
         return li;
       }),
     ),
   );
-  document.getElementById('scale').value = f;
+  document.getElementById('scale').value = Number(((baseServings ?? 1) * f).toFixed(2));
   history.replaceState(null, '', `?slug=${encodeURIComponent(slug)}&scale=${f}`);
 }
 
-const db = await openDb();
-
 // Added
+const minutes = (m) =>
+  m >= 60 ? `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ''}` : `${m} min`;
+
+const hostname = (url) => {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
+};
+
+function pill(kind, ...content) {
+  const span = el('span', `metadata-pill metadata-${kind}`);
+  span.append(...content);
+  return span;
+}
+
+function sourcePill({ source_name: name, source_url: url }) {
+  let href = null;
+  try {
+    const u = new URL(url);
+    if (u.protocol === 'http:' || u.protocol === 'https:') href = u.href;
+  } catch { /* no URL, or not a valid one */ }
+  if (!href) return pill('source', `📖 ${name ?? url}`);
+  const link = el('a', 'text-info hover:underline ml-1', name ?? hostname(href));
+  link.href = href;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  return pill('source', '📖', link);
+}
+
+function metadataPills(row, extra) {
+  const pills = [];
+  if (row.cuisine) pills.push(pill('cuisine', `🌍 ${row.cuisine}`));
+
+  if (row.servings_count != null) {
+    pills.push(pill('servings', `👥 ${row.servings_count} servings`));
+  } else if (row.servings_text) {
+    pills.push(pill('servings', `👥 ${row.servings_text}`));
+  }
+  scaleNoticeEl = el('a', 'metadata-pill metadata-original');
+  scaleNoticeEl.href = `recipe.html?slug=${encodeURIComponent(slug)}`;
+  scaleNoticeEl.title =
+    'Quantities are scaled from the original recipe. Cooking times, pan sizes and seasoning may need adjusting. Select to go back to the original.';
+  pills.push(scaleNoticeEl);
+
+  if (row.prep_minutes != null || row.cook_minutes != null) {
+    if (row.prep_minutes != null) pills.push(pill('prep', `⏱️ Prep: ${minutes(row.prep_minutes)}`));
+    if (row.cook_minutes != null) pills.push(pill('cook', `🔥 Cook: ${minutes(row.cook_minutes)}`));
+  } else if (row.total_minutes != null) {
+    pills.push(pill('time', `⏱️ ${minutes(row.total_minutes)}`));
+  }
+  if (row.difficulty) pills.push(pill('difficulty', `📊 ${row.difficulty}`));
+  for (const [key, icon] of [['course', '🍽️'], ['diet', '🥗'], ['author', '👤']]) {
+    if (typeof extra[key] === 'string') pills.push(pill(key, `${icon} ${extra[key]}`));
+  }
+  if (row.source_name || row.source_url) pills.push(sourcePill(row));
+  return pills;
+}
+
+let scaleNoticeEl;
+
+function updateScaleNotice(f) {
+  scaleNoticeEl.style.display = f === 1 ? 'none' : '';
+  scaleNoticeEl.textContent = baseServings != null
+    ? `📖 Written for ${baseServings} ${baseServings === 1 ? 'serving' : 'servings'}`
+    : `📖 ×${Number(f.toFixed(2))} of the original recipe`;
+}
+
+const db = await openDb();
+await init();
+
 let linkedRecipeSlugs = new Map();
+let scalable;
 mountRecipeSearch(db);
 
-const [row] = query(db, 'SELECT json FROM recipe_data WHERE slug = ?', [slug]);
+const [row] = query(
+  db,
+  `SELECT d.json, r.*
+   FROM recipe_data d JOIN recipes r ON r.slug = d.slug
+   WHERE d.slug = ?`,
+  [slug],
+);
+const baseServings = row?.servings_count ?? null;
 if (!row) {
   document.body.textContent = 'Recipe not found';
 } else {
   const recipe = JSON.parse(row.json);
+  scalable = new ScalableRecipe(row.json);
   linkedRecipeSlugs = new Map();
-
   for (const [position, ingredient] of recipe.ingredients.entries()) {
     if (!ingredient.reference) continue;
 
@@ -256,10 +343,7 @@ if (!row) {
       renderNutrition(enrichedIngredients, factor);
     }
   });
-  const recipeMetadata = recipe.metadata?.map ?? {};
   const tags = document.getElementById('tags');
-  const cuisine = document.getElementById('cuisine');
-
   const recipeTags = query(
     db,
     'SELECT tag FROM recipe_tags WHERE slug = ? ORDER BY tag',
@@ -269,15 +353,20 @@ if (!row) {
       tags.append(el('span', 'tag', `#${tag}`));
   }
 
-  if (recipeMetadata.cuisine) {
-      cuisine.append(el('span', 'metadata-pill metadata-cuisine', `🌍 ${recipeMetadata.cuisine}`));
+  const recipeMetadata = recipe.metadata?.map ?? {};
+  document.getElementById('metadata').append(...metadataPills(row, recipeMetadata));
+  document.getElementById('title').textContent = recipeMetadata.title ?? slug;
+  document.getElementById('breadcrumb-title').textContent = recipeMetadata.title ?? slug;
+  
+  if (baseServings != null) {
+    document.querySelector('label[for="scale"]').textContent = 'Servings:';
   }
-
-  document.getElementById('title').textContent = recipe.metadata.map.title ?? slug;
-  document.getElementById('breadcrumb-title').textContent = recipe.metadata.map.title ?? slug;
   const set = (n) => { if (n > 0 && n <= 200) { factor = n; render(recipe, factor); } };
-  document.getElementById('minus').onclick = () => set(Math.max(0.5, factor - 0.5));
-  document.getElementById('plus').onclick = () => set(factor + 0.5);
-  document.getElementById('scale').onchange = (e) => set(parseFloat(e.target.value));
+  const unit = baseServings ?? 1; // one stepper unit: a serving, or ×1
+  const move = (delta) => set(Math.max(0.5, factor * unit + delta) / unit);
+  document.getElementById('minus').onclick = () => move(-0.5);
+  document.getElementById('plus').onclick = () => move(0.5);
+  document.getElementById('scale').onchange = (e) => set(parseFloat(e.target.value) / unit);
+
   render(recipe, factor);
 }

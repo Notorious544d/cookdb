@@ -1,7 +1,7 @@
 import { openDb, query } from './db.js';
 import { mountSiteHeader } from './site-header.js';
 
-mountSiteHeader();
+await mountSiteHeader();
 
 const search = document.getElementById('search-input');
 const count = document.getElementById('ingredient-count');

@@ -1,6 +1,7 @@
 target/
 node_modules/
 static/css/output.css
+static/wasm/cookdb_wasm*
 static/js/editor.bundle.js
 *.db
 

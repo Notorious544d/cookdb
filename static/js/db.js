@@ -3,7 +3,7 @@ let dbPromise;
 export function openDb() {
   dbPromise ??= (async () => {
     const [SQL, buf] = await Promise.all([
-      initSqlJs({ locateFile: (f) => `js/${f}` }), // global from sql-wasm.js
+      initSqlJs({ locateFile: (f) => `wasm/${f}` }),
       fetch('./recipes.db').then((r) => {
         if (!r.ok) throw new Error(`recipes.db: HTTP ${r.status}`);
         return r.arrayBuffer();

@@ -17,7 +17,7 @@ pub struct SearchArgs {
 }
 
 pub fn run(ctx: &Context, args: SearchArgs) -> anyhow::Result<()> {
-    let db = args.db.unwrap_or_else(|| ctx.db_path());
+    let db = args.db.unwrap_or_else(|| ctx.db_path.clone());
     let conn = Connection::open_with_flags(&db, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let pattern = format!("%{}%", args.terms.join(" "));
 

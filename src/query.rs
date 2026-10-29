@@ -12,7 +12,7 @@ pub struct QueryArgs {
 }
 
 pub fn run(ctx: &Context, args: QueryArgs) -> anyhow::Result<()> {
-    let db = args.db.unwrap_or_else(|| ctx.db_path());
+    let db = args.db.unwrap_or_else(|| ctx.db_path.clone());
     let conn = Connection::open_with_flags(&db, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let mut stmt = conn.prepare(&args.sql)?;
     let cols = stmt.column_count();

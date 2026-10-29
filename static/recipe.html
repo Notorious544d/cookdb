@@ -55,13 +55,17 @@
     </div>
     <div class="space-y-4 mb-8">
         <div id="tags" class="flex flex-wrap gap-2"></div>
-        <div id="cuisine" class="flex flex-wrap gap-3"></div>
+        <div id="metadata" class="flex flex-wrap gap-3"></div>
     </div>
     <div class="grid md:grid-cols-3 xl:grid-cols-4 gap-8 mb-8">
         <div class="md:col-span-1 space-y-4">
             <div class="card p-6">
                 <h2 class="text-title font-bold mb-4 text-accent-text">🥘 Ingredients</h2>
                 <ul id="ingredients" class="ingredient-list space-y-3"></ul>
+            </div>
+            <div id="cookware-card" class="card p-6" hidden>
+                <h2 class="text-title font-bold mb-4 text-accent-text">🍳 Cookware</h2>
+                <ul id="cookware" class="ingredient-list space-y-2"></ul>
             </div>
             <aside>
                 <div class="card p-6">
@@ -91,6 +95,6 @@
     </div>
 </div>
 <script src="js/keyboard-shortcuts.js"></script>
-<script src="js/sql-wasm.js"></script>
+<script src="wasm/sql-wasm.js"></script>
 <script type="module" src="js/recipe.js"></script>
 </body></html>
